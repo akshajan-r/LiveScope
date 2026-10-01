@@ -1,0 +1,63 @@
+# Manual: download the UCSD Twitch dataset, build streamer profiles and
+# evaluate the viewer-return model. The raw file is cached between runs and
+# never committed.
+name: UCSD dataset
+
+on:
+  workflow_dispatch:
+    inputs:
+      variant:
+        description: "100k sample or the full dataset"
+        type: choice
+        options: ["100k", "full"]
+        default: "100k"
+      engine:
+        description: "duckdb (profiles + model) or spark (profiles only, for the full file)"
+        type: choice
+        options: ["duckdb", "spark"]
+        default: "duckdb"
+
+permissions:
+  contents: read
+
+jobs:
+  ucsd:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      LIVESCOPE_DATASTORE: datastore
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install ".[ml,ucsd]"
+
+      - uses: actions/cache@v4
+        with:
+          path: datastore/ucsd
+          key: ucsd-${{ inputs.variant }}-v1
+
+      - name: Download
+        run: python -c "from pathlib import Path; from livescope import ucsd; print(ucsd.download(Path('datastore/ucsd'), '${{ inputs.variant }}'))"
+
+      - name: Profiles and return model (DuckDB)
+        if: inputs.engine == 'duckdb'
+        run: python -m livescope ucsd --variant ${{ inputs.variant }} --file "$(ls datastore/ucsd/* | head -1)"
+
+      - uses: actions/setup-java@v4
+        if: inputs.engine == 'spark'
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Profiles (PySpark)
+        if: inputs.engine == 'spark'
+        run: |
+          pip install ".[spark]"
+          python spark/ucsd_spark.py "$(ls datastore/ucsd/* | head -1)" exports/ucsd_spark
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ucsd-${{ inputs.variant }}-${{ inputs.engine }}
+          path: exports/

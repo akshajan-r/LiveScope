@@ -1,0 +1,19 @@
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+# Local data (real data lives on the `data` branch, see docs/setup.md)
+datastore/
+data/
+build/
+exports/
+*.duckdb
+*.duckdb.wal
+# Dashboard
+dashboard/node_modules/
+dashboard/dist/
+dashboard/src/.observablehq/cache/
+dashboard/src/data/*.parquet
+dashboard/src/data/*.json
+dashboard/src/data/*.arrow

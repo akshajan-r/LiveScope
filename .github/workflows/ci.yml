@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - run: pip install ".[dev,spark]"
+      - run: python -m pytest -q
+
+  dashboard:
+    # Builds the dashboard from synthetic data so page errors show up before a
+    # real publish. Nothing is deployed.
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+      - run: pip install ".[ml]"
+      - name: Synthetic data and exports
+        env:
+          LIVESCOPE_DATASTORE: demo-store
+        run: |
+          python -m livescope demo
+          python -m livescope build
+      - name: Build dashboard
+        working-directory: dashboard
+        env:
+          OBSERVABLE_TELEMETRY_DISABLE: "true"
+        run: |
+          cp ../exports/dashboard/* src/data/
+          npm ci
+          npm run build
