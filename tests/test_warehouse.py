@@ -94,6 +94,25 @@ def test_platform_week_kpis(tiny):
     assert pw.viewer_hours_wow[1] == pytest.approx((2000 + 168) / (1000 + 500 + 168) - 1)
 
 
+def test_retention_tables(tiny):
+    # Everyone joins the panel in week 1, the first collection week.
+    pc = tiny.execute("select * from panel_creators").df()
+    assert pc.founding_cohort.all() and len(pc) == 3
+    cr = tiny.execute("select weeks_since, active, cohort_size from cohort_retention order by weeks_since").fetchall()
+    assert cr == [(0, 3, 3), (1, 2, 3), (2, 3, 3)]
+    lt = tiny.execute("select user_id, duration_weeks, churned from creator_lifetime order by user_id").fetchall()
+    assert lt == [("a", 3, False), ("b", 3, False), ("filler", 3, False)]
+
+
+def test_language_and_category_tables(tiny):
+    assert tiny.execute("select language_group from creator_language where user_id = 'a'").fetchone()[0] == "English"
+    lw = tiny.execute("select active_creators from language_week where language = 'en' order by week_start").fetchall()
+    assert [r[0] for r in lw] == [3, 2, 3]
+    co = tiny.execute("select * from category_opportunity where scope = 'All'").df()
+    assert set(co.game_name) == {"Art"} and co.opportunity_index.iloc[0] == pytest.approx(1.0)
+    assert set(tiny.execute("select distinct scope from category_opportunity").df().scope) == {"All", "English"}
+
+
 def test_partial_week_is_incomplete(tmp_path):
     raw = tmp_path / "raw"
     start = pd.Timestamp("2026-01-05 00:07", tz="UTC")

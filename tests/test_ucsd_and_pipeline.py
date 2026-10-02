@@ -79,6 +79,10 @@ def test_pipeline_end_to_end(tmp_path, settings):
         assert (settings.exports / "parquet" / f"{name}.parquet").exists()
     results = json.loads((dash / "analyses.json").read_text())
     assert "abtest_validation" in results and "segment_profiles" in results
+    assert meta["analyses"]["survival"]["status"] == "ok"
+    assert {"survival_curves", "survival_milestones", "segment_language_mix", "findings"} <= set(results)
+    assert all(f["status"] in ("measured", "pending") for f in results["findings"])
+    assert (settings.exports / "findings.md").read_text().startswith("# Measured facts")
     import pyarrow as pa
     with pa.OSFile(str(dash / "creator_week.arrow"), "rb") as f:
         assert pa.ipc.open_stream(f).read_all().num_rows > 0

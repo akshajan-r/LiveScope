@@ -5,9 +5,9 @@
 **How.** `.github/workflows/collect.yml` runs at minute 7 of every hour and calls the Twitch Helix [Get Streams](https://dev.twitch.tv/docs/api/reference/#get-streams) endpoint with an app access token (client-credentials flow). Each run captures:
 
 - the top `LIVESCOPE_MAX_STREAMS` (default 2,000) live streams, ordered by current viewers (`source = "top"`, with `rank`);
-- every live stream from the **tracking panel** that is not already in that list (`source = "panel"`). The panel is the first `LIVESCOPE_PANEL_MAX` (default 5,000) creators ever seen in a top list, looked up by `user_id` in batches of 100.
+- every live stream from the **tracking panel** that is not already in that list (`source = "panel"`). The panel is the first `LIVESCOPE_PANEL_MAX` (default 30,000) creators ever seen in a top list, looked up by `user_id` in batches of 100. Every creator who breaks into the top list joins the panel until it is full, so each week's newcomers can be followed afterwards (the basis of the retention and survival analysis).
 
-At the defaults that is about 25 requests per run, well inside Helix's limit of 800 points per minute.
+At the defaults that is at most about 320 requests per run (20 for the top list, 300 for a full panel), inside Helix's limit of 800 points per minute.
 
 **Fields kept:** snapshot time, stream id, broadcaster id/login/name, category id/name, language, viewer count, stream start time, mature flag, tags, source and rank. Stream titles and thumbnails are not stored.
 
@@ -34,8 +34,10 @@ On an error nothing is written and the run fails; every run, failed or not, is l
 
 - **Selection.** Creators enter by ranking in the top list. "Creators" means the most-watched end of Twitch; small creators are mostly invisible. Results do not generalise to the long tail.
 - **The panel fixes drop-off, not entry.** Once in the panel, a creator is observed whenever they are live, however few viewers they have, so declines and drop-off are measured properly. Creators who never reach the top list are never observed.
-- **The panel fills up.** After it reaches `LIVESCOPE_PANEL_MAX`, new creators appear only while they rank. Later cohorts are therefore observed less completely than early ones; compare cohorts with care.
+- **The panel fills up.** After it reaches `LIVESCOPE_PANEL_MAX`, new creators appear only while they rank, and the retention analysis stops admitting new cohorts (it only counts panel creators). At around 1,000–3,000 newcomers a week, 30,000 lasts a few months; raise it if needed, but very large panels make each run slower.
+- **Panel creators join on a schedule set by the first run.** The first collection week puts thousands of already-established creators into the panel at once. That cohort is labelled as such in the retention analysis and kept apart from genuine newcomers.
 - **Hourly sampling.** A stream shorter than an hour can fall between snapshots; a stream seen in three snapshots counts as three hours.
+- **Language is not country.** The EU split uses broadcast language. Spanish and Portuguese are mostly Latin American and Brazilian audiences, English is global, and an EU creator streaming in English counts as English.
 - **Viewer counts** are Twitch's concurrent viewer figures (they include embedded players and are not unique viewers).
 - **Scheduling gaps.** GitHub can delay or drop scheduled runs at busy times. Weeks with less than 90% of hours captured are excluded from weekly metrics.
 - **Scheduled workflows stop after 60 days without repository activity** on public repositories. The hourly commits to `data` count as activity, but if collection stops for any reason, re-enable the workflow under the Actions tab.

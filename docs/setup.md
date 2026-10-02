@@ -24,7 +24,7 @@ Optional repository **variables** (Settings → Secrets and variables → Action
 | Variable | Default | Meaning |
 |---|---|---|
 | `LIVESCOPE_MAX_STREAMS` | `2000` | top live streams captured per snapshot |
-| `LIVESCOPE_PANEL_MAX` | `5000` | creators tracked outside the top list |
+| `LIVESCOPE_PANEL_MAX` | `30000` | creators tracked outside the top list |
 | `REBUILD_EVERY_RUN` | unset | `true` republishes the dashboard every hour instead of daily |
 
 Minutes: an ingest run takes about a minute and a publish run a few minutes. Public repositories have unlimited Actions minutes; on a private repository hourly collection uses roughly 750–1,500 of the 2,000 free minutes a month.
@@ -76,3 +76,5 @@ Commands:
 | `python -m livescope ucsd` | download and process the UCSD dataset |
 | `python -m livescope abtest-validate` | simulation check of the A/B testing toolkit |
 | `python -m livescope bigquery --project ...` | load exports into BigQuery |
+| `python -m livescope experiment-plan ...` | sample size and duration for a real A/B test |
+| `python -m livescope experiment-readout ...` | analyse a PostHog feature-flag experiment ([docs/experiments.md](experiments.md)) |

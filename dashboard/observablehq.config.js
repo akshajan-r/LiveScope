@@ -7,6 +7,10 @@ export default {
   style: "style.css",
   pages: [
     {name: "Overview", path: "/"},
+    {name: "Findings", path: "/findings"},
+    {name: "Retention", path: "/retention"},
+    {name: "Europe", path: "/europe"},
+    {name: "Categories", path: "/categories"},
     {name: "Creators & segments", path: "/creators"},
     {name: "Growth model", path: "/models"},
     {name: "Experiments", path: "/experiments"},

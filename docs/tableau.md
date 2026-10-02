@@ -17,6 +17,11 @@ https://<user>.github.io/LiveScope/downloads/<table>.csv
 | `segment_profiles.csv` | segment | segment sizes and medians |
 | `category_week.csv` | category × week | category trends |
 | `platform_hour.csv` | hour | daily and weekly cycles |
+| `cohort_retention.csv` | cohort × weeks since | cohort retention heat map |
+| `creator_lifetime.csv` | creator | survival inputs (duration, churned, language group) |
+| `survival_curves.csv`, `survival_milestones.csv` | group × week | Kaplan–Meier curves and 1/2/4/8-week survival |
+| `language_week.csv` | language × week | EU vs English comparisons |
+| `category_opportunity.csv` | category × scope | opportunity scatter and table |
 | `peak_hours.csv` | hour of day | peak-hour definition |
 | `model_metrics_growth.csv`, `feature_importance_growth.csv` | model / feature | model comparison |
 | `did_summary.csv`, `did_event_study.csv` | estimate / week | natural experiment |

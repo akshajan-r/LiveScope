@@ -43,7 +43,9 @@ def analyze_experiment(
     out["primary"] = res.as_dict()
 
     decisive = res
-    if pre_period is not None and not binary:
+    # CUPED is a linear adjustment, so it also applies to 0/1 outcomes (it is
+    # then regression adjustment of a difference in proportions).
+    if pre_period is not None:
         adj, reduction = cuped_ttest(
             c[primary].to_numpy(), c[pre_period].to_numpy(), t[primary].to_numpy(), t[pre_period].to_numpy(), alpha,
             f"{primary} (CUPED)",
