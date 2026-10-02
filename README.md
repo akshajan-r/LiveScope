@@ -4,7 +4,7 @@
 
 LiveScope collects its own dataset of Twitch live streams every hour, models it in SQL, segments creators, predicts next-week growth, analyses a natural experiment, and publishes the results as a dashboard that rebuilds itself.
 
-- **Dashboard:** [akshajan-r.github.io/LiveScope](https://akshajan-r.github.io/LiveScope/), rebuilt daily from the latest data
+- **Dashboard:** [akshajan-r.github.io/LiveScope](https://akshajan-r.github.io/LiveScope/), rebuilt after every hourly snapshot · collection progress on the [`data` branch](https://github.com/akshajan-r/LiveScope/tree/data)
 - **Tableau Public workbook:** _link once published_ ([docs/tableau.md](docs/tableau.md))
 
 ## Findings: recommendations for a creator-success team
@@ -87,7 +87,7 @@ flowchart LR
 | A/B testing | Sample size, power, MDE, two-proportion z-test, Welch's t-test, CUPED, SRM, non-inferiority guardrails; validated on simulated experiments; PostHog feature-flag pull and readout for a real test | [`livescope/experiments`](livescope/experiments), [`docs/experiments.md`](docs/experiments.md) |
 | Natural experiment | Peak-hours difference-in-differences with an event study | [`causal/did.py`](livescope/causal/did.py) |
 | Large dataset | UCSD Twitch interactions processed with DuckDB, or PySpark for the full 124M rows; viewer-return model | [`ucsd.py`](livescope/ucsd.py), [`spark/`](spark), [`ucsd.yml`](.github/workflows/ucsd.yml) |
-| Dashboard | SQL-driven static site (DuckDB-wasm in the browser), rebuilt daily | [`dashboard/`](dashboard) |
+| Dashboard | SQL-driven static site (DuckDB-wasm in the browser), rebuilt after every snapshot | [`dashboard/`](dashboard) |
 | Cloud | Optional load of every table into BigQuery | [`bigquery.py`](livescope/bigquery.py) |
 
 Data sources, sampling and their biases are documented in [docs/data.md](docs/data.md). The main one: creators enter the data by ranking in the top 2,000, so results describe the most-watched part of Twitch, not the long tail.

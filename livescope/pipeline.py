@@ -28,6 +28,7 @@ from livescope.config import Settings
 from livescope.experiments.simulate import validate
 from livescope.predict import build_dataset, evaluate
 from livescope.segmentation import creator_features, segment
+from livescope.status import load_runs
 
 log = logging.getLogger(__name__)
 
@@ -63,6 +64,21 @@ def _write(df: pd.DataFrame, name: str, exports: Path) -> None:
     flat.to_csv(exports / "tableau" / f"{name}.csv", index=False)
 
 
+def collection_runs(settings: Settings) -> pd.DataFrame:
+    """One row per collector run from the manifest (empty for synthetic data)."""
+    runs = load_runs(settings.runs_log)
+    out = pd.DataFrame({
+        "snapshot_at": pd.to_datetime(runs["snapshot_at"], utc=True),
+        "status": runs["status"].astype("string"),
+        "top_rows": pd.to_numeric(runs["top_rows"]).astype("Int64"),
+        "panel_rows": pd.to_numeric(runs["panel_rows"]).astype("Int64"),
+        "panel_size": pd.to_numeric(runs["panel_size"]).astype("Int64"),
+        "issues": runs["errors"].map(lambda e: len(e) if isinstance(e, list) else 0).astype("Int64")
+                  + runs["warnings"].map(lambda w: len(w) if isinstance(w, list) else 0).astype("Int64"),
+    })
+    return out
+
+
 def run(settings: Settings, exports: Path | None = None, abtest_sims: int = 500) -> dict:
     exports = exports or settings.exports
     if exports.exists():
@@ -71,6 +87,8 @@ def run(settings: Settings, exports: Path | None = None, abtest_sims: int = 500)
 
     for name, sql in EXPORT_TABLES.items():
         _write(con.execute(sql).df(), name, exports)
+
+    _write(collection_runs(settings), "collection_runs", exports)
 
     cw = con.execute("select * from creator_week").df()
     analyses: dict[str, dict] = {}
