@@ -32,3 +32,7 @@ See [`docs/metrics.md`](https://github.com/akshajan-r/LiveScope/blob/main/docs/m
 ## Models
 
 SQL models (DuckDB) turn snapshots into a creator-hour table, then a creator-week table with hours live, average and peak viewers, hours watched, week-on-week growth and streak length (gaps-and-islands). Segmentation is k-means on standardised creator features with k chosen by silhouette score (a Gaussian mixture with BIC is fit as a check). The growth model compares a base-rate baseline, a momentum rule, logistic regression and LightGBM on a time-based split.
+
+## Retention, Europe and categories
+
+Retention uses panel creators only, so a missing week means the creator did not go live. Churn is two complete weeks without going live; survival curves are Kaplan–Meier with Greenwood/log-log 95% intervals, compared with log-rank tests. The EU view groups creators by their main broadcast language. Language stands in for market, which is imperfect: Spanish and Portuguese are mostly Latin American and Brazilian audiences, and they are kept as their own group. Category opportunity compares the median creator's audience in a category with the median across all categories over the last 28 days, flagging categories dominated by one creator. Full definitions are in [`docs/metrics.md`](https://github.com/akshajan-r/LiveScope/blob/main/docs/metrics.md).

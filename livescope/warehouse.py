@@ -27,7 +27,13 @@ def connect(warehouse: Path | str = ":memory:") -> duckdb.DuckDBPyConnection:
     return con
 
 
-def build(raw_dir: Path, warehouse: Path | str = ":memory:") -> duckdb.DuckDBPyConnection:
+def build(raw_dir: Path, warehouse: Path | str = ":memory:", panel_path: Path | None = None) -> duckdb.DuckDBPyConnection:
+    """Run every SQL model over the snapshots in `raw_dir`.
+
+    `panel_path` is the collector's panel file (creators tracked outside the
+    top list). Without it, every creator is treated as tracked, which is right
+    for synthetic data where every live creator is observed.
+    """
     files = sorted(Path(raw_dir).glob("**/*.parquet"))
     if not files:
         raise FileNotFoundError(f"no snapshot files under {raw_dir}")
@@ -37,6 +43,16 @@ def build(raw_dir: Path, warehouse: Path | str = ":memory:") -> duckdb.DuckDBPyC
         f"create or replace view raw_snapshots as "
         f"select * from read_parquet('{glob}', union_by_name = true, hive_partitioning = false)"
     )
+    if panel_path is not None and Path(panel_path).exists():
+        con.execute(
+            f"create or replace table panel as "
+            f"select user_id, first_seen_at::timestamp as first_seen_at from read_parquet('{panel_path}')"
+        )
+    else:
+        con.execute(
+            "create or replace table panel as "
+            "select user_id, min(snapshot_hour::timestamp) as first_seen_at from raw_snapshots group by user_id"
+        )
     for name, sql in sql_models():
         log.info("running %s", name)
         con.execute(sql)

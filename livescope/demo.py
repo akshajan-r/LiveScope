@@ -22,8 +22,24 @@ CATEGORIES = [
     ("516575", "VALORANT"),
     ("33214", "Fortnite"),
     ("27471", "Minecraft"),
+    ("32399", "Counter-Strike"),
+    ("511224", "Apex Legends"),
     ("26936", "Music"),
     ("509660", "Art"),
+    ("29595", "Dota 2"),
+    ("512710", "Call of Duty: Warzone"),
+    ("509663", "Special Events"),
+    ("518203", "Sports"),
+    ("490100", "Lost Ark"),
+    ("509670", "Science & Technology"),
+    ("1469308723", "Software and Game Development"),
+    ("509667", "Food & Drink"),
+    ("509659", "ASMR"),
+    ("2748", "Magic: The Gathering"),
+    ("27546", "World of Tanks"),
+    ("509672", "Travel & Outdoors"),
+    ("488552", "Overwatch 2"),
+    ("1745202732", "Chess"),
 ]
 LANGUAGES = ["en", "en", "en", "es", "pt", "de", "fr", "ja", "ko"]
 
@@ -53,10 +69,19 @@ def generate(
     session_len = rng.integers(2, 7, size=n_creators)
     days_per_week = rng.integers(1, 8, size=n_creators)
     churn_week = np.where(rng.random(n_creators) < 0.15, rng.integers(min(2, weeks), weeks + 1, size=n_creators), weeks + 1)
+    # A third of creators debut after collection starts; newcomers churn more,
+    # mostly within their first few weeks.
+    debut_week = np.where(rng.random(n_creators) < 0.35, rng.integers(1, max(2, weeks - 1), size=n_creators), 0)
+    newcomer_churn = (debut_week > 0) & (rng.random(n_creators) < 0.45)
+    churn_week = np.where(newcomer_churn, debut_week + 1 + rng.geometric(0.4, size=n_creators), churn_week)
     # Some creators move their schedule to 20:00 UTC halfway through, giving the
     # difference-in-differences analysis something to find.
     moves_to_peak = rng.random(n_creators) < 0.15
-    cat = rng.integers(0, len(CATEGORIES), size=n_creators)
+    # Category popularity among creators is long-tailed (Zipf-like), and each
+    # category has its own audience multiplier, so supply and demand differ.
+    cat_weights = 1 / np.arange(1, len(CATEGORIES) + 1) ** 1.1
+    cat = rng.choice(len(CATEGORIES), size=n_creators, p=cat_weights / cat_weights.sum())
+    cat_demand = rng.lognormal(0.0, 0.5, size=len(CATEGORIES))
     lang = rng.choice(LANGUAGES, size=n_creators)
     # Platform-wide audience curve peaking around 20:00-01:00 UTC.
     tod_effect = 0.75 + 0.5 * np.exp(-0.5 * (((hod - 22 + 12) % 24 - 12) / 3.0) ** 2)
@@ -68,11 +93,11 @@ def generate(
         dow_live = live_days[week_idx, day_of_run % 7]
         start_at = np.where(moves_to_peak[c] & (week_idx >= weeks // 2), 20, pref_hour[c])
         in_session = ((hod - start_at) % 24) < session_len[c]
-        live = dow_live & in_session & (week_idx < churn_week[c])
+        live = dow_live & in_session & (week_idx >= debut_week[c]) & (week_idx < churn_week[c])
         idx = np.flatnonzero(live)
         if idx.size == 0:
             continue
-        mu = base[c] * np.exp(growth[c] * week_idx[idx]) * tod_effect[idx]
+        mu = base[c] * cat_demand[cat[c]] * np.exp(growth[c] * week_idx[idx]) * tod_effect[idx]
         viewers = rng.poisson(np.maximum(mu, 0.5))
         # A new stream id each time a session starts.
         starts = np.r_[True, np.diff(idx) > 1]

@@ -23,7 +23,7 @@ permissions:
 env:
   LIVESCOPE_DATASTORE: datastore
   LIVESCOPE_MAX_STREAMS: ${{ vars.LIVESCOPE_MAX_STREAMS || '2000' }}
-  LIVESCOPE_PANEL_MAX: ${{ vars.LIVESCOPE_PANEL_MAX || '5000' }}
+  LIVESCOPE_PANEL_MAX: ${{ vars.LIVESCOPE_PANEL_MAX || '30000' }}
 
 jobs:
   ingest:

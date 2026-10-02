@@ -49,5 +49,5 @@ def get_settings() -> Settings:
         warehouse=Path(os.environ.get("LIVESCOPE_WAREHOUSE", "build/livescope.duckdb")),
         exports=Path(os.environ.get("LIVESCOPE_EXPORTS", "exports")),
         max_streams=_env_int("LIVESCOPE_MAX_STREAMS", 2000),
-        panel_max=_env_int("LIVESCOPE_PANEL_MAX", 5000),
+        panel_max=_env_int("LIVESCOPE_PANEL_MAX", 30000),
     )

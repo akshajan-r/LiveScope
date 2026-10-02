@@ -22,7 +22,7 @@ from pathlib import Path
 import pandas as pd
 import pyarrow as pa
 
-from livescope import warehouse
+from livescope import findings, survival, warehouse
 from livescope.causal.did import peak_hours_did
 from livescope.config import Settings
 from livescope.experiments.simulate import validate
@@ -39,6 +39,10 @@ EXPORT_TABLES = {
     "peak_hours": "select * from peak_hours order by hour_utc",
     "collector_weeks": "select * from collector_weeks order by week_start",
     "platform_week": "select * from platform_week order by week_start",
+    "language_week": "select * from language_week order by week_start, language",
+    "cohort_retention": "select * from cohort_retention",
+    "creator_lifetime": "select * from creator_lifetime",
+    "category_opportunity": "select * from category_opportunity",
 }
 
 
@@ -63,7 +67,7 @@ def run(settings: Settings, exports: Path | None = None, abtest_sims: int = 500)
     exports = exports or settings.exports
     if exports.exists():
         shutil.rmtree(exports)
-    con = warehouse.build(settings.raw_dir, settings.warehouse)
+    con = warehouse.build(settings.raw_dir, settings.warehouse, settings.panel_path)
 
     for name, sql in EXPORT_TABLES.items():
         _write(con.execute(sql).df(), name, exports)
@@ -80,10 +84,16 @@ def run(settings: Settings, exports: Path | None = None, abtest_sims: int = 500)
             (exports / "tableau").mkdir(parents=True, exist_ok=True)
             df.to_csv(exports / "tableau" / f"{name}.csv", index=False)
 
+    languages = con.execute("select user_id, language, language_name, language_group from creator_language").df()
+
     try:
         res = segment(creator_features(cw))
-        keep("segments", res.assignments)
+        assignments = res.assignments.merge(languages, on="user_id", how="left")
+        keep("segments", assignments)
         keep("segment_profiles", res.profiles)
+        mix = assignments.groupby(["language_group", "segment"]).size().rename("creators").reset_index()
+        mix["share"] = mix["creators"] / mix.groupby("language_group")["creators"].transform("sum")
+        keep("segment_language_mix", mix)
         keep("segment_k_selection", pd.DataFrame({
             "k": list(res.silhouette_by_k), "silhouette": list(res.silhouette_by_k.values()),
             "gmm_bic": [res.bic_by_k[k] for k in res.silhouette_by_k]}))
@@ -117,6 +127,15 @@ def run(settings: Settings, exports: Path | None = None, abtest_sims: int = 500)
     except ValueError as exc:
         analyses["did_peak_hours"] = {"status": "skipped", "reason": str(exc)}
 
+    try:
+        surv = survival.analyse(con.execute("select * from creator_lifetime").df())
+        keep("survival_curves", surv.curves)
+        keep("survival_milestones", surv.milestones)
+        keep("survival_tests", surv.tests)
+        analyses["survival"] = {"status": "ok", "groups": sorted(surv.curves["group"].unique().tolist())}
+    except ValueError as exc:
+        analyses["survival"] = {"status": "skipped", "reason": str(exc)}
+
     keep("abtest_validation", validate(n_sims=abtest_sims, seed=42))
     analyses["abtest_validation"] = {"status": "ok", "simulations": abtest_sims}
 
@@ -141,6 +160,9 @@ def run(settings: Settings, exports: Path | None = None, abtest_sims: int = 500)
         "panel_max": settings.panel_max,
         "analyses": analyses,
     }
+    facts = findings.measured_facts(con, results, analyses)
+    results["findings"] = facts
+    (exports / "findings.md").write_text(findings.to_markdown(facts, meta))
     (exports / "dashboard" / "meta.json").write_text(json.dumps(meta, indent=2, default=str))
     (exports / "dashboard" / "analyses.json").write_text(json.dumps(results, default=str))
     (exports / "tableau" / "meta.json").write_text(json.dumps(meta, indent=2, default=str))

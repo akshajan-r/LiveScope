@@ -58,6 +58,62 @@ Question: when a creator moves more of their streaming into platform peak hours,
 
 Read it as evidence, not proof: creators choose when to stream, and anything that changes at the same time as the schedule (a new game, a collaboration, a holiday) is attributed to the move. The event study's pre-period points and the pre-trend test are the minimum checks.
 
-## Running a real A/B test
+## Running a real A/B test (PostHog)
 
-The toolkit is validated on simulations; it has not analysed a real experiment yet. To get one, run a small feature-flag experiment (for example with PostHog's free tier) on a site you control, export one row per user with group, outcome and a pre-period value, and pass it to `analyze_experiment`.
+Everything above is validated on simulations. The only honest way to say "ran an A/B test" is to run one. This is the runbook for a small feature-flag experiment on a client's website, analysed with this toolkit.
+
+### 1. Agree the test with the client
+
+Get written agreement on what changes, who sees it and how long it runs. Pick a change that could plausibly move a metric the client cares about (for example the wording or placement of a booking or contact button).
+
+### 2. Pick a metric the site's traffic can actually test
+
+Small sites have little traffic, so plan first:
+
+```bash
+# 150 visitors a day, 4% currently click "Book", hoping for +25%
+python -m livescope experiment-plan --baseline 0.04 --mde 0.25 --daily-users 150
+#   6,745 people per group, 90 days at 150 people/day -> run 13 full weeks
+#   If capped at 4 weeks: smallest detectable change 1.87 pp (47% relative)
+```
+
+If the answer is months, choose a metric closer to the change with a higher baseline (a click on the changed element instead of a completed booking), accept that only a large effect is detectable and say so in the write-up, or run longer. Record the decision before starting.
+
+### 3. Write the plan before starting
+
+Copy [`experiment-template.md`](experiment-template.md) to `docs/experiments/<flag>.md` and fill it in: hypothesis, primary metric, guardrails, sample size, start and end dates. Commit it before launch; that commit is your pre-registration.
+
+### 4. Set up PostHog
+
+1. Create a PostHog project. Use **EU Cloud** (`eu.posthog.com`) for a European client's visitors, and check the consent setup with the client: under GDPR, analytics cookies need consent. Either show a consent banner or run posthog-js cookieless (`persistence: "memory"`); cookieless mode treats a returning visitor as new, so sessions rather than people are randomised.
+2. Add posthog-js to the site and identify the conversion event, e.g. `posthog.capture("booking_clicked")` on the button.
+3. Create a **multivariate feature flag**, key e.g. `cta-copy`, with variants `control` and `test` at 50/50.
+4. Render the change from the flag. Calling the flag records the exposure event (`$feature_flag_called`) that the readout uses:
+
+```js
+posthog.onFeatureFlags(() => {
+  if (posthog.getFeatureFlag("cta-copy") === "test") {
+    document.querySelector("#book").textContent = "Check availability";
+  }
+});
+```
+
+5. Test both variants yourself (PostHog lets you override a flag per user), then launch.
+
+### 5. Run it, then read it out once
+
+Do not stop early because the numbers look good: these are fixed-horizon tests, and peeking inflates false positives. At the planned end:
+
+```bash
+export POSTHOG_HOST=https://eu.posthog.com POSTHOG_PROJECT_ID=12345 POSTHOG_API_KEY=phx_...   # personal API key, query:read
+python -m livescope experiment-readout --flag cta-copy --event booking_clicked \
+    --start 2026-10-12 --end 2026-11-09
+```
+
+The readout pulls exposures and events through PostHog's query API, keeps the first variant each person saw (people shown both are dropped and counted), and reports the sample-ratio check, the conversion difference with its 95% CI, a CUPED-adjusted estimate using each person's pre-period activity, guardrails, the effect size the sample could detect, and a decision. It is written to `exports/experiments/<flag>/readout.md`.
+
+The person-level table is never saved, because it contains the client's visitors' ids. Commit only the readout and the plan. Without API access, export a CSV with `person_id, variant, converted, pre_count` and pass `--csv`.
+
+### 6. Report honestly
+
+State the result with its interval ("+1.1 pp, 95% CI −0.4 to +2.6 pp, inconclusive") and the detectable effect. An inconclusive result from a well-run test is still a real A/B test, and saying what the test could and could not detect is the part interviewers probe.

@@ -67,6 +67,37 @@ The platform-level weekly values (north star, KRs, guardrails) are in the `platf
 | Audience concentration | Share of weekly hours watched going to the top 1% of creators by hours watched. | week | `platform_week.top1pct_share` |
 | Viewers per live hour | Hours watched ÷ creator hours live, across all tracked creators. | week | `platform_week.viewers_per_live_hour` |
 
+## Retention and survival
+
+Computed for **panel creators** only (see [data.md](data.md)): they are looked up every hour whatever their rank, so a week without them in the data really is a week without going live.
+
+| Term | Definition | Source |
+|---|---|---|
+| Cohort | The week a creator first entered the top list (joined the panel). | `panel_creators.cohort_week` |
+| Founding cohort | Creators who joined in the first collection week. Most were already established, so they are reported separately from newcomers. | `panel_creators.founding_cohort` |
+| Cohort retention, week k | Share of a cohort live in the k-th week after its cohort week. Counts week-by-week activity, so a skipped week dips and recovers. | `cohort_retention` |
+| Churn | No live week in the two most recent complete weeks. Creators who come back after a longer gap are counted by their last live week. | `creator_lifetime.churned` |
+| Lifetime | Weeks from cohort week to last live week (churned), or weeks followed so far (censored). | `creator_lifetime.duration_weeks` |
+| Survival S(t) | Kaplan–Meier estimate of the share still streaming more than t weeks after their cohort week, with Greenwood/log-log 95% CIs. Reported at 1, 2, 4 and 8 weeks. | `livescope/survival.py` |
+| Survival difference | Log-rank test between groups (EU/EEA vs English newcomers; all language groups). | `livescope/survival.py` |
+
+## Language groups
+
+Twitch's broadcast language stands in for market. **EU/EEA languages** are German, French, Italian, Polish, Dutch, Swedish, Danish, Finnish, Norwegian, Czech, Slovak, Hungarian, Romanian, Bulgarian, Greek, Croatian, Slovenian, Estonian, Latvian, Lithuanian and Catalan. **Spanish & Portuguese** are a separate group because most of those audiences are in Latin America and Brazil. A creator's language is the most frequent language across their streams (`creator_language`).
+
+## Category opportunity
+
+Over the last 28 days, for all creators and for each language group (`category_opportunity`):
+
+| Metric | Definition |
+|---|---|
+| Median creator viewers | Median, across the category's creators, of each creator's average concurrent viewers while streaming that category. |
+| Opportunity index | Median creator viewers ÷ the median across all creator-category pairs in the same scope. 2.0 = the typical creator in this category draws twice the typical audience. |
+| Top creator share | Share of the category's hours watched that come from its biggest creator. ≥ 50% means the "demand" is mostly one creator's fanbase. |
+| Viewer-hours growth | Hours watched in the last 14 days ÷ the previous 14 days − 1 (null until 28 days are collected). |
+
+Candidates are categories with an index above 1, at least 5 creators and a top creator share below 50%. Rankings wait for 7 days of data. They are hypotheses to test, not conclusions.
+
 ## Segment definitions
 
 Segments come from k-means on six creator features over the last four complete weeks (log average viewers, viewer trend, share of weeks active, hours live per week, peak-hour share, categories per week), k chosen by silhouette score. Names are assigned by rules on the standardised cluster centres, in this order:
