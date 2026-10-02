@@ -1,0 +1,145 @@
+# Hourly: capture a snapshot of live Twitch streams and append it to the `data`
+# branch. Once a day (and on manual runs) also rebuild the warehouse, rerun the
+# analyses and redeploy the dashboard to GitHub Pages.
+name: Collect and publish
+
+on:
+  schedule:
+    - cron: "7 * * * *"
+  workflow_dispatch:
+    inputs:
+      skip_ingest:
+        description: "Only rebuild and publish the dashboard"
+        type: boolean
+        default: false
+
+concurrency:
+  group: collect
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+env:
+  LIVESCOPE_DATASTORE: datastore
+  LIVESCOPE_MAX_STREAMS: ${{ vars.LIVESCOPE_MAX_STREAMS || '2000' }}
+  LIVESCOPE_PANEL_MAX: ${{ vars.LIVESCOPE_PANEL_MAX || '5000' }}
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      rebuild: ${{ steps.decide.outputs.rebuild }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install .
+
+      - name: Check out the data branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/checkout_data_branch.sh datastore
+
+      - name: Capture snapshot
+        id: ingest
+        if: ${{ !inputs.skip_ingest }}
+        env:
+          TWITCH_CLIENT_ID: ${{ secrets.TWITCH_CLIENT_ID }}
+          TWITCH_CLIENT_SECRET: ${{ secrets.TWITCH_CLIENT_SECRET }}
+        run: python -m livescope ingest
+
+      # Runs even when the quality checks fail, so the failed run is recorded
+      # in manifest/runs.jsonl.
+      - name: Commit to the data branch
+        if: ${{ always() && !inputs.skip_ingest }}
+        run: scripts/push_data_branch.sh datastore "snapshot $(date -u +%Y-%m-%dT%H:%MZ)"
+
+      - name: Decide whether to rebuild the dashboard
+        id: decide
+        if: always()
+        run: |
+          if [ "${{ github.event_name }}" != "schedule" ] || [ "$(date -u +%H)" = "06" ] \
+             || [ "${{ vars.REBUILD_EVERY_RUN }}" = "true" ]; then
+            echo "rebuild=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "rebuild=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  publish:
+    needs: ingest
+    if: ${{ !cancelled() && needs.ingest.outputs.rebuild == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    env:
+      HAS_GCP: ${{ secrets.GCP_SA_KEY != '' && vars.GCP_PROJECT != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        with:
+          ref: data
+          path: datastore
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install ".[ml]"
+
+      - name: Build warehouse, run analyses, export tables
+        run: python -m livescope build
+
+      - name: Load tables into BigQuery
+        if: env.HAS_GCP == 'true'
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+      - if: env.HAS_GCP == 'true'
+        run: |
+          pip install ".[bq]"
+          python -m livescope bigquery --project "${{ vars.GCP_PROJECT }}" --dataset "${{ vars.BQ_DATASET || 'livescope' }}"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+
+      - name: Build dashboard
+        working-directory: dashboard
+        env:
+          OBSERVABLE_TELEMETRY_DISABLE: "true"
+        run: |
+          cp ../exports/dashboard/* src/data/
+          npm ci
+          npm run build
+          # Tableau / Power BI extracts, downloadable from the published site.
+          mkdir -p dist/downloads
+          cp ../exports/tableau/* dist/downloads/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tableau-extracts
+          path: exports/tableau
+          retention-days: 14
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dashboard/dist
+
+      - id: deploy
+        uses: actions/deploy-pages@v4
