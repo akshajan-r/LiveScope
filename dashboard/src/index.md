@@ -7,6 +7,7 @@ sql:
   category_week: ./data/category_week.arrow
   collector_weeks: ./data/collector_weeks.arrow
   platform_week: ./data/platform_week.arrow
+  collection_runs: ./data/collection_runs.arrow
 ---
 
 ```js
@@ -16,7 +17,7 @@ const meta = FileAttachment("data/meta.json").json();
 
 # LiveScope
 
-Which creators are growing, which are at risk of dropping off, and what helps them grow? This dashboard is rebuilt by GitHub Actions after the data refreshes.
+Which creators are growing, which are at risk of dropping off, and what helps them grow? This dashboard is rebuilt by GitHub Actions after every hourly snapshot.
 
 ```js
 display(sourceBanner(meta));
@@ -30,6 +31,57 @@ display(sourceBanner(meta));
 </div>
 
 <p class="caption">Data from ${fmt.date(meta.first_snapshot)} to ${fmt.date(meta.last_snapshot)} (UTC). Each snapshot holds the top ${fmt.int(meta.max_streams_per_snapshot)} live streams by viewers plus every live stream of the ${fmt.int(meta.panel_max)}-creator tracking panel. Last built ${meta.generated_at}.</p>
+
+## Collection log
+
+```sql id=runs
+select snapshot_at, status, top_rows, panel_rows, panel_size, issues from collection_runs order by snapshot_at
+```
+
+```js
+const runRows = [...runs].map((d) => ({...d, snapshot_at: toDate(d.snapshot_at), top_rows: Number(d.top_rows),
+  panel_rows: Number(d.panel_rows), panel_size: Number(d.panel_size), issues: Number(d.issues)}));
+const okRuns = runRows.filter((d) => d.status === "ok");
+const lastRun = okRuns.at(-1);
+const perDay = d3.rollups(okRuns, (v) => new Set(v.map((d) => d.snapshot_at.toISOString().slice(0, 13))).size,
+  (d) => d.snapshot_at.toISOString().slice(0, 10)).map(([day, hours]) => ({day, hours}));
+```
+
+```js
+if (!runRows.length) {
+  display(html`<p class="caption">No collector runs recorded (synthetic data has none).</p>`);
+} else {
+  display(html`<div class="grid grid-cols-3">
+    <div class="card"><h2>Snapshots collected</h2><span class="big">${fmt.int(okRuns.length)}</span>
+      <p class="caption">${runRows.length - okRuns.length ? `${runRows.length - okRuns.length} failed runs` : "No failed runs"}</p></div>
+    <div class="card"><h2>Latest snapshot (UTC)</h2><span class="big">${lastRun ? lastRun.snapshot_at.toISOString().slice(11, 16) : "–"}</span>
+      <p class="caption">${lastRun ? fmt.date(lastRun.snapshot_at) : ""}</p></div>
+    <div class="card"><h2>Creators in the tracking panel</h2><span class="big">${lastRun ? fmt.int(lastRun.panel_size) : "–"}</span></div>
+  </div>`);
+  display(html`<div class="card"><h2>Hours captured per day</h2><h3>One snapshot an hour means 24 a day; the line marks 24. Today is still filling in.</h3>
+    ${resize((width) => Plot.plot({
+      width, height: 200, marginLeft: 40,
+      x: {label: null, type: "point", tickFormat: (d) => d.slice(5), padding: 0.6},
+      y: {grid: true, label: "Hours captured", domain: [0, 24], ticks: [0, 6, 12, 18, 24]},
+      marks: [
+        // A fixed-width rule instead of a band bar, so one day does not fill the chart.
+        Plot.ruleX(perDay, {x: "day", y1: 0, y2: "hours", stroke: "var(--series-1)", strokeWidth: Math.min(20, (width - 60) / perDay.length * 0.6),
+          tip: true, title: (d) => `${d.day}\n${d.hours} of 24 hours captured`}),
+        Plot.ruleY([24], {stroke: "var(--theme-foreground-muted)"}),
+        Plot.ruleY([0], {stroke: "var(--baseline)"})
+      ]
+    }))}</div>`);
+  display(Inputs.table(runRows.slice().reverse(), {
+    layout: "auto",
+    columns: ["snapshot_at", "status", "top_rows", "panel_rows", "panel_size", "issues"],
+    header: {snapshot_at: "Run (UTC)", status: "Status", top_rows: "Top-list streams", panel_rows: "Panel-only streams", panel_size: "Panel size", issues: "Quality notes"},
+    format: {snapshot_at: (d) => d.toISOString().slice(0, 16).replace("T", " "), top_rows: fmt.int, panel_rows: fmt.int, panel_size: fmt.int},
+    rows: 6, select: false
+  }));
+}
+```
+
+<p class="caption">The dashboard rebuilds after each new snapshot. The same log, updated even when the dashboard is not, is on the <a href="https://github.com/akshajan-r/LiveScope/tree/data">data branch</a>.</p>
 
 ## Weekly KPIs
 

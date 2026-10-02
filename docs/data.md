@@ -2,7 +2,7 @@
 
 ## 1. Hourly Twitch snapshots (collected by this project)
 
-**How.** `.github/workflows/collect.yml` runs at minute 7 of every hour and calls the Twitch Helix [Get Streams](https://dev.twitch.tv/docs/api/reference/#get-streams) endpoint with an app access token (client-credentials flow). Each run captures:
+**How.** `.github/workflows/collect.yml` is scheduled at minutes 23 and 53 of every hour and calls the Twitch Helix [Get Streams](https://dev.twitch.tv/docs/api/reference/#get-streams) endpoint with an app access token (client-credentials flow). A run that finds the current UTC hour already captured exits without doing anything, so there is one snapshot an hour with a second chance when GitHub skips a scheduled run (it delays or drops them at busy times). Each run captures:
 
 - the top `LIVESCOPE_MAX_STREAMS` (default 2,000) live streams, ordered by current viewers (`source = "top"`, with `rank`);
 - every live stream from the **tracking panel** that is not already in that list (`source = "panel"`). The panel is the first `LIVESCOPE_PANEL_MAX` (default 30,000) creators ever seen in a top list, looked up by `user_id` in batches of 100. Every creator who breaks into the top list joins the panel until it is full, so each week's newcomers can be followed afterwards (the basis of the retention and survival analysis).

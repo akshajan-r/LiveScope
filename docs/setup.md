@@ -17,7 +17,15 @@ The collector uses the client-credentials flow (an app access token), so no user
 
 ## 3. Start collecting
 
-**Actions → Collect and publish → Run workflow.** The first run creates the `data` branch, stores one snapshot and publishes the dashboard. After that the workflow runs at minute 7 of every hour and republishes the dashboard once a day (06:07 UTC).
+**Actions → Collect and publish → Run workflow.** The first run creates the `data` branch, stores one snapshot and publishes the dashboard. After that the workflow is scheduled twice an hour (minutes 23 and 53) and captures one snapshot per hour; the second slot only acts if GitHub skipped the first. The dashboard republishes after every new snapshot.
+
+**Checking progress.** Three places, from quickest to most detailed:
+
+- The [`data` branch](https://github.com/akshajan-r/LiveScope/tree/data) README: snapshots collected, hours captured since the start, and a table of the last 24 runs with times and row counts. Updated by every run.
+- The dashboard's Overview page, "Collection log": the same numbers plus hours captured per day.
+- **Actions → Collect and publish**: one entry per run. A run that took a snapshot has a job summary with the status table; runs that found the hour already captured finish in under a minute.
+
+Newly added schedules can take a few hours before GitHub starts firing them, and GitHub delays scheduled runs at busy times. If the status shows no snapshot for several hours, start a run by hand from the Actions tab.
 
 Optional repository **variables** (Settings → Secrets and variables → Actions → Variables):
 
@@ -25,9 +33,9 @@ Optional repository **variables** (Settings → Secrets and variables → Action
 |---|---|---|
 | `LIVESCOPE_MAX_STREAMS` | `2000` | top live streams captured per snapshot |
 | `LIVESCOPE_PANEL_MAX` | `30000` | creators tracked outside the top list |
-| `REBUILD_EVERY_RUN` | unset | `true` republishes the dashboard every hour instead of daily |
+| `REBUILD_DAILY_ONLY` | unset | `true` republishes the dashboard only on the 06:xx UTC run (saves Actions minutes on a private repository) |
 
-Minutes: an ingest run takes about a minute and a publish run a few minutes. Public repositories have unlimited Actions minutes; on a private repository hourly collection uses roughly 750–1,500 of the 2,000 free minutes a month.
+Minutes: an ingest run takes 1–3 minutes, a skipped slot under a minute, and a publish run about 2 minutes. Public repositories have unlimited Actions minutes. On a private repository, hourly collection plus hourly publishing would exceed the 2,000 free minutes a month, so set `REBUILD_DAILY_ONLY=true` there.
 
 ## 4. BigQuery (optional, free sandbox)
 

@@ -1,11 +1,17 @@
 # Hourly: capture a snapshot of live Twitch streams and append it to the `data`
-# branch. Once a day (and on manual runs) also rebuild the warehouse, rerun the
-# analyses and redeploy the dashboard to GitHub Pages.
+# branch, then rebuild the warehouse, rerun the analyses and redeploy the
+# dashboard to GitHub Pages.
+#
+# GitHub delays or drops scheduled runs at busy times, especially near the top
+# of the hour. So the schedule fires twice an hour at quiet minutes, and a run
+# that finds this hour already captured does nothing: one snapshot an hour,
+# with a second chance when GitHub skips one.
 name: Collect and publish
 
 on:
   schedule:
-    - cron: "7 * * * *"
+    - cron: "23 * * * *"
+    - cron: "53 * * * *"
   workflow_dispatch:
     inputs:
       skip_ingest:
@@ -31,6 +37,7 @@ jobs:
     timeout-minutes: 15
     outputs:
       rebuild: ${{ steps.decide.outputs.rebuild }}
+      captured: ${{ steps.ingest.outputs.captured }}
     steps:
       - uses: actions/checkout@v4
 
@@ -52,23 +59,34 @@ jobs:
         env:
           TWITCH_CLIENT_ID: ${{ secrets.TWITCH_CLIENT_ID }}
           TWITCH_CLIENT_SECRET: ${{ secrets.TWITCH_CLIENT_SECRET }}
-        run: python -m livescope ingest
+        # Scheduled runs skip if this hour is done; manual runs always capture.
+        run: python -m livescope ingest ${{ github.event_name == 'schedule' && '--skip-if-captured' || '' }}
 
       # Runs even when the quality checks fail, so the failed run is recorded
-      # in manifest/runs.jsonl.
+      # in manifest/runs.jsonl and shows in the status table.
+      - name: Update the collection status
+        if: ${{ always() && steps.ingest.outputs.captured == 'true' }}
+        run: python -m livescope status --write
+
       - name: Commit to the data branch
-        if: ${{ always() && !inputs.skip_ingest }}
+        if: ${{ always() && steps.ingest.outputs.captured == 'true' }}
         run: scripts/push_data_branch.sh datastore "snapshot $(date -u +%Y-%m-%dT%H:%MZ)"
 
+      # Rebuild after every new snapshot (Actions minutes are free on public
+      # repositories). Set the variable REBUILD_DAILY_ONLY=true to rebuild only
+      # on the 06:xx UTC run, e.g. on a private repository.
       - name: Decide whether to rebuild the dashboard
         id: decide
         if: always()
         run: |
-          if [ "${{ github.event_name }}" != "schedule" ] || [ "$(date -u +%H)" = "06" ] \
-             || [ "${{ vars.REBUILD_EVERY_RUN }}" = "true" ]; then
+          if [ "${{ github.event_name }}" != "schedule" ]; then
             echo "rebuild=true" >> "$GITHUB_OUTPUT"
-          else
+          elif [ "${{ steps.ingest.outputs.captured }}" != "true" ]; then
             echo "rebuild=false" >> "$GITHUB_OUTPUT"
+          elif [ "${{ vars.REBUILD_DAILY_ONLY }}" = "true" ] && [ "$(date -u +%H)" != "06" ]; then
+            echo "rebuild=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "rebuild=true" >> "$GITHUB_OUTPUT"
           fi
 
   publish:

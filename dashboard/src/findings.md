@@ -15,7 +15,7 @@ const results = FileAttachment("data/analyses.json").json();
 display(sourceBanner(meta));
 ```
 
-What the data shows as of the latest build (${fmt.date(meta.last_snapshot)}, ${fmt.int(meta.complete_weeks)} complete weeks). These sentences are generated from the numbers on the other pages and update with every build. They state measurements only; the recommendations for a creator-success team are in the [README](https://github.com/akshajan-r/LiveScope#findings), written once there is enough data to support them.
+What the data shows as of the latest build (${fmt.date(meta.last_snapshot)}, ${fmt.int(meta.complete_weeks)} complete weeks). These sentences are generated from the numbers on the other pages and update with every hourly build. They state measurements only; the recommendations for a creator-success team are in the [README](https://github.com/akshajan-r/LiveScope#findings), written once there is enough data to support them.
 
 ```js
 const facts = results.findings ?? [];

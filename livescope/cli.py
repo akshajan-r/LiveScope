@@ -12,10 +12,24 @@ from pathlib import Path
 from livescope.config import get_settings
 
 
+def _set_output(name: str, value: str) -> None:
+    """Expose a value to later GitHub Actions steps (no-op outside Actions)."""
+    path = os.environ.get("GITHUB_OUTPUT")
+    if path:
+        with open(path, "a") as fh:
+            fh.write(f"{name}={value}\n")
+
+
 def cmd_ingest(args, settings) -> int:
     from livescope.ingest.snapshot import QualityError, run_snapshot
     from livescope.ingest.twitch import HelixClient, HelixError
+    from livescope.status import captured_this_hour
 
+    if args.skip_if_captured and captured_this_hour(settings):
+        print("a snapshot for this hour already exists; skipping")
+        _set_output("captured", "false")
+        return 0
+    _set_output("captured", "true")
     try:
         client = HelixClient(os.environ.get("TWITCH_CLIENT_ID", ""), os.environ.get("TWITCH_CLIENT_SECRET", ""))
         record = run_snapshot(client, settings)
@@ -26,6 +40,20 @@ def cmd_ingest(args, settings) -> int:
         print(f"Twitch API error: {exc}", file=sys.stderr)
         return 1
     print(json.dumps(record, indent=2))
+    return 0
+
+
+def cmd_status(args, settings) -> int:
+    from livescope.status import to_markdown
+
+    md = to_markdown(settings)
+    if args.write:
+        (settings.datastore / "README.md").write_text(md)
+    summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
+    if summary_path:
+        with open(summary_path, "a") as fh:
+            fh.write(md.split("## Layout")[0])
+    print(md)
     return 0
 
 
@@ -135,7 +163,11 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="livescope")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    sub.add_parser("ingest", help="capture one snapshot of live Twitch streams")
+    p = sub.add_parser("ingest", help="capture one snapshot of live Twitch streams")
+    p.add_argument("--skip-if-captured", action="store_true", help="do nothing if this UTC hour already has a snapshot")
+
+    p = sub.add_parser("status", help="summarise collected snapshots and recent runs")
+    p.add_argument("--write", action="store_true", help="also write the summary to the data store's README.md")
     sub.add_parser("build", help="build the warehouse, run analyses, export tables")
 
     p = sub.add_parser("demo", help="write synthetic snapshots for local development")
@@ -182,7 +214,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     settings = get_settings()
     handler = {
-        "ingest": cmd_ingest, "build": cmd_build, "demo": cmd_demo, "ucsd": cmd_ucsd,
+        "ingest": cmd_ingest, "status": cmd_status, "build": cmd_build, "demo": cmd_demo, "ucsd": cmd_ucsd,
         "abtest-validate": cmd_abtest, "bigquery": cmd_bigquery,
         "experiment-plan": cmd_experiment_plan, "experiment-readout": cmd_experiment_readout,
     }[args.command]
