@@ -4,13 +4,13 @@ Written by the `Collect and publish` workflow; do not edit by hand.
 
 ## Collection status
 
-_Updated 2026-10-11 21:01 UTC._
+_Updated 2026-10-11 22:01 UTC._
 
 | | |
 |---|---|
-| Snapshots collected | **229** (828,978 rows) |
-| First / latest | 2026-10-02 10:42 / 2026-10-11 21:01 UTC |
-| Hours captured since the first snapshot | 222 of 228 (97%) |
+| Snapshots collected | **230** (833,229 rows) |
+| First / latest | 2026-10-02 10:42 / 2026-10-11 22:01 UTC |
+| Hours captured since the first snapshot | 223 of 229 (97%) |
 | Creators in the tracking panel | 30,000 |
 | Failed runs | 0 |
 
@@ -18,6 +18,7 @@ _Updated 2026-10-11 21:01 UTC._
 
 | Time (UTC) | Status | Top-list rows | Panel rows | Panel size | Notes |
 |---|---|---|---|---|---|
+| 2026-10-11 22:01 | ok | 2,000 | 2,251 | 30,000 |  |
 | 2026-10-11 21:01 | ok | 2,000 | 2,524 | 30,000 |  |
 | 2026-10-11 20:01 | ok | 2,000 | 2,856 | 30,000 |  |
 | 2026-10-11 19:01 | ok | 2,000 | 2,772 | 30,000 |  |
@@ -41,7 +42,6 @@ _Updated 2026-10-11 21:01 UTC._
 | 2026-10-11 02:01 | ok | 2,000 | 2,149 | 30,000 |  |
 | 2026-10-11 01:01 | ok | 2,000 | 2,227 | 30,000 |  |
 | 2026-10-11 00:01 | ok | 2,000 | 2,274 | 30,000 |  |
-| 2026-10-10 23:01 | ok | 2,000 | 2,418 | 30,000 |  |
 
 ## Layout
 
