@@ -115,7 +115,7 @@ def measured_facts(con: duckdb.DuckDBPyConnection, results: dict, analyses: dict
         if len(part) and days >= MIN_CATEGORY_DAYS:
             items = "; ".join(f"{r.game_name} ({r.opportunity_index:.1f}× the median, {r.creators} creators)" for r in part.itertuples())
             facts.append(_fact(f"Category opportunity ({label})",
-                               f"Highest median viewers per creator in the last 28 days, among categories with 5+ creators and no single creator "
+                               f"Highest median viewers per creator in the last 28 days, among categories with 20+ creators and no single creator "
                                f"holding half the audience: {items}.", "/categories"))
 
     # Growth model.

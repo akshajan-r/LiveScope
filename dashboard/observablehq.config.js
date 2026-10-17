@@ -7,6 +7,7 @@ export default {
   style: "style.css",
   pages: [
     {name: "Overview", path: "/"},
+    {name: "This week", path: "/weekly"},
     {name: "Findings", path: "/findings"},
     {name: "Retention", path: "/retention"},
     {name: "Europe", path: "/europe"},

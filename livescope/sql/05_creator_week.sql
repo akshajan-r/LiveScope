@@ -2,8 +2,11 @@
 -- dashboard. Hours are counted from hourly snapshots, so `hours_live` is the
 -- number of snapshot hours the creator was live (an hourly sample, not exact
 -- minutes) and `viewer_hours` is the matching estimate of hours watched.
-create or replace table creator_week as
-with weekly as (
+-- Weekly aggregates from the raw window, merged with saved history for weeks
+-- whose raw snapshots have been deleted. Lag-based columns (growth, streaks)
+-- are computed after the merge so they run across the boundary.
+create or replace table creator_week_base as
+with raw_weekly as (
     select
         ch.user_id,
         week_start,
@@ -24,7 +27,16 @@ with weekly as (
     from creator_hour ch
     left join peak_hours ph using (hour_utc)
     group by ch.user_id, week_start
-),
+)
+select h.* from history_creator_week_base h, raw_bounds rb
+where h.week_start < rb.first_full_week
+union all by name
+select r.* from raw_weekly r, raw_bounds rb
+where r.week_start >= rb.first_full_week
+   or r.week_start not in (select distinct week_start from history_creator_week_base);
+
+create or replace table creator_week as
+with weekly as (select * from creator_week_base),
 with_lags as (
     select
         w.*,

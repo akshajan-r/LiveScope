@@ -80,6 +80,8 @@ def test_pipeline_end_to_end(tmp_path, settings):
     results = json.loads((dash / "analyses.json").read_text())
     assert "abtest_validation" in results and "segment_profiles" in results
     assert meta["analyses"]["survival"]["status"] == "ok"
+    assert meta["analyses"]["weekly_report"]["status"] == "ok"
+    assert (settings.exports / "weekly_report.md").exists()
     assert {"survival_curves", "survival_milestones", "segment_language_mix", "findings"} <= set(results)
     assert all(f["status"] in ("measured", "pending") for f in results["findings"])
     assert (settings.exports / "findings.md").read_text().startswith("# Measured facts")
@@ -94,3 +96,4 @@ def test_pipeline_with_little_data_skips_analyses(settings):
     assert meta["analyses"]["segmentation"]["status"] == "skipped"
     assert meta["analyses"]["predict_growth"]["status"] == "skipped"
     assert meta["analyses"]["did_peak_hours"]["status"] == "skipped"
+    assert "3 complete weeks" in meta["analyses"]["survival"]["reason"]

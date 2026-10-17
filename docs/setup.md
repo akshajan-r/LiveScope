@@ -32,7 +32,9 @@ Optional repository **variables** (Settings → Secrets and variables → Action
 | Variable | Default | Meaning |
 |---|---|---|
 | `LIVESCOPE_MAX_STREAMS` | `2000` | top live streams captured per snapshot |
-| `LIVESCOPE_PANEL_MAX` | `30000` | creators tracked outside the top list |
+| `LIVESCOPE_PANEL_MAX` | `60000` | most creators looked up outside the top list at once |
+| `LIVESCOPE_PANEL_EVICT_DAYS` | `28` | days without going live before a creator stops being looked up |
+| `LIVESCOPE_RAW_RETENTION_DAYS` | `30` | days of raw snapshots kept; `0` keeps everything (weekly history is always kept) |
 | `REBUILD_DAILY_ONLY` | unset | `true` republishes the dashboard only on the 06:xx UTC run (saves Actions minutes on a private repository) |
 
 Minutes: an ingest run takes 1–3 minutes, a skipped slot under a minute, and a publish run about 2 minutes. Public repositories have unlimited Actions minutes. On a private repository, hourly collection plus hourly publishing would exceed the 2,000 free minutes a month, so set `REBUILD_DAILY_ONLY=true` there.
@@ -79,6 +81,7 @@ Commands:
 | Command | What it does |
 |---|---|
 | `python -m livescope ingest` | one snapshot (needs the Twitch secrets as environment variables) |
+| `python -m livescope maintain` | compact finished days, save weekly history, delete expired raw days |
 | `python -m livescope build` | warehouse, analyses, exports for the dashboard / Tableau / BigQuery |
 | `python -m livescope demo` | synthetic snapshots for development |
 | `python -m livescope ucsd` | download and process the UCSD dataset |

@@ -9,7 +9,7 @@ LiveScope collects its own dataset of Twitch live streams every hour, models it 
 
 ## Findings: recommendations for a creator-success team
 
-> **Status: collecting data (started 2 October 2026).** This page is written once the evidence exists: retention needs about 4 complete weeks of follow-up, and the growth model and the peak-hours experiment need 6 or more. Until then each section says what it will answer and where the evidence comes from. The dashboard's [Findings page](https://akshajan-r.github.io/LiveScope/findings) shows the measured numbers as they accumulate; every number below will be copied from it, with its confidence interval and sample size.
+> **Status: collecting data (started 2 October 2026).** The week in progress is on the dashboard's [This week](https://akshajan-r.github.io/LiveScope/weekly) page, rebuilt hourly. This page is written once the evidence exists: retention needs about 4 complete weeks of follow-up, and the growth model and the peak-hours experiment need 6 or more. Until then each section says what it will answer and where the evidence comes from. The dashboard's [Findings page](https://akshajan-r.github.io/LiveScope/findings) shows the measured numbers as they accumulate; every number below will be copied from it, with its confidence interval and sample size.
 
 **Who this is for:** a team whose job is to get more creators streaming LIVE, keep them streaming, and help them grow, with a focus on the EU.
 

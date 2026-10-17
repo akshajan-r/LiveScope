@@ -29,6 +29,8 @@ from livescope.experiments.simulate import validate
 from livescope.predict import build_dataset, evaluate
 from livescope.segmentation import creator_features, segment
 from livescope.status import load_runs
+from livescope.weekly import to_markdown as weekly_markdown
+from livescope.weekly import weekly_report
 
 log = logging.getLogger(__name__)
 
@@ -83,7 +85,7 @@ def run(settings: Settings, exports: Path | None = None, abtest_sims: int = 500)
     exports = exports or settings.exports
     if exports.exists():
         shutil.rmtree(exports)
-    con = warehouse.build(settings.raw_dir, settings.warehouse, settings.panel_path)
+    con = warehouse.build(settings.raw_dir, settings.warehouse, settings.panel_path, settings.history_dir)
 
     for name, sql in EXPORT_TABLES.items():
         _write(con.execute(sql).df(), name, exports)
@@ -146,6 +148,12 @@ def run(settings: Settings, exports: Path | None = None, abtest_sims: int = 500)
         analyses["did_peak_hours"] = {"status": "skipped", "reason": str(exc)}
 
     try:
+        complete = con.execute("select count(*) from collector_weeks where is_complete").fetchone()[0]
+        if complete < 3:
+            # Churn is two complete weeks without going live after a creator's
+            # last live week, so nobody can churn before the third complete
+            # week; earlier curves would show a meaningless 100%.
+            raise ValueError(f"churn can first be observed after 3 complete weeks, have {complete}")
         surv = survival.analyse(con.execute("select * from creator_lifetime").df())
         keep("survival_curves", surv.curves)
         keep("survival_milestones", surv.milestones)
@@ -153,6 +161,11 @@ def run(settings: Settings, exports: Path | None = None, abtest_sims: int = 500)
         analyses["survival"] = {"status": "ok", "groups": sorted(surv.curves["group"].unique().tolist())}
     except ValueError as exc:
         analyses["survival"] = {"status": "skipped", "reason": str(exc)}
+
+    weekly = weekly_report(con)
+    results["weekly_report"] = weekly
+    (exports / "weekly_report.md").write_text(weekly_markdown(weekly))
+    analyses["weekly_report"] = {"status": weekly["status"]}
 
     keep("abtest_validation", validate(n_sims=abtest_sims, seed=42))
     analyses["abtest_validation"] = {"status": "ok", "simulations": abtest_sims}

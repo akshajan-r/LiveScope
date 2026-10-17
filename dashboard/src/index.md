@@ -85,6 +85,8 @@ if (!runRows.length) {
 
 ## Weekly KPIs
 
+<p class="caption">Complete weeks only (Monday–Sunday UTC), so the latest point can be up to a week old. For the week in progress see <a href="./weekly">This week</a>.</p>
+
 ```sql id=kpis
 select * from platform_week order by week_start
 ```

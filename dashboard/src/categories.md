@@ -25,7 +25,7 @@ if (days < 7) display(html`<div class="banner">Only ${days.toFixed(1)} days of d
 
 ```js
 const scope = view(Inputs.select(["All", "EU/EEA languages", "English", "Spanish & Portuguese", "Other"], {label: "Creators streaming in", value: "All"}));
-const minCreators = view(Inputs.range([1, 50], {value: 5, step: 1, label: "Min. creators"}));
+const minCreators = view(Inputs.range([1, 100], {value: 20, step: 1, label: "Min. creators"}));
 ```
 
 ```sql id=cats
@@ -37,7 +37,7 @@ order by opportunity_index desc
 ```js
 const rows = [...cats].map((d) => ({...d, creators: Number(d.creators), creator_hours: Number(d.creator_hours), viewer_hours: Number(d.viewer_hours)}))
   .map((d) => ({...d, concentrated: d.top_creator_share >= 0.5}));
-const candidates = rows.filter((d) => !d.concentrated && d.opportunity_index > 1).slice(0, 5);
+const candidates = rows.filter((d) => !d.concentrated && d.opportunity_index > 1 && d.enough_creators).slice(0, 5);
 const candidateNames = new Set(candidates.map((d) => d.game_name));
 if (!rows.length) display(html`<p class="skipped">No categories with at least ${minCreators} creators in this scope yet.</p>`);
 ```

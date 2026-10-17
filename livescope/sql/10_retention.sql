@@ -5,7 +5,9 @@
 -- established already, so that cohort is flagged and kept apart.
 create or replace table panel_creators as
 with first_week as (
-    select date_trunc('week', min(snapshot_hour))::date as w from collector_hours
+    -- collector_weeks includes history, so this stays the true first week
+    -- even after old raw snapshots are deleted.
+    select min(week_start) as w from collector_weeks
 )
 select
     p.user_id,

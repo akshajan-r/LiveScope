@@ -43,6 +43,15 @@ def cmd_ingest(args, settings) -> int:
     return 0
 
 
+def cmd_maintain(args, settings) -> int:
+    from livescope.storage import maintain
+
+    result = maintain(settings)
+    _set_output("squash", "true" if result["changed"] else "false")
+    print(json.dumps(result, indent=2))
+    return 0
+
+
 def cmd_status(args, settings) -> int:
     from livescope.status import to_markdown
 
@@ -166,6 +175,8 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("ingest", help="capture one snapshot of live Twitch streams")
     p.add_argument("--skip-if-captured", action="store_true", help="do nothing if this UTC hour already has a snapshot")
 
+    sub.add_parser("maintain", help="compact finished days, save weekly history, delete expired raw days")
+
     p = sub.add_parser("status", help="summarise collected snapshots and recent runs")
     p.add_argument("--write", action="store_true", help="also write the summary to the data store's README.md")
     sub.add_parser("build", help="build the warehouse, run analyses, export tables")
@@ -214,7 +225,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     settings = get_settings()
     handler = {
-        "ingest": cmd_ingest, "status": cmd_status, "build": cmd_build, "demo": cmd_demo, "ucsd": cmd_ucsd,
+        "ingest": cmd_ingest, "maintain": cmd_maintain, "status": cmd_status, "build": cmd_build, "demo": cmd_demo, "ucsd": cmd_ucsd,
         "abtest-validate": cmd_abtest, "bigquery": cmd_bigquery,
         "experiment-plan": cmd_experiment_plan, "experiment-readout": cmd_experiment_readout,
     }[args.command]

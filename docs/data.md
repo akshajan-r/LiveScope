@@ -5,13 +5,20 @@
 **How.** `.github/workflows/collect.yml` is scheduled at minutes 23 and 53 of every hour and calls the Twitch Helix [Get Streams](https://dev.twitch.tv/docs/api/reference/#get-streams) endpoint with an app access token (client-credentials flow). A run that finds the current UTC hour already captured exits without doing anything, so there is one snapshot an hour with a second chance when GitHub skips a scheduled run (it delays or drops them at busy times). Each run captures:
 
 - the top `LIVESCOPE_MAX_STREAMS` (default 2,000) live streams, ordered by current viewers (`source = "top"`, with `rank`);
-- every live stream from the **tracking panel** that is not already in that list (`source = "panel"`). The panel is the first `LIVESCOPE_PANEL_MAX` (default 30,000) creators ever seen in a top list, looked up by `user_id` in batches of 100. Every creator who breaks into the top list joins the panel until it is full, so each week's newcomers can be followed afterwards (the basis of the retention and survival analysis).
+- every live stream from the **tracking panel** that is not already in that list (`source = "panel"`). Every creator who breaks into the top list joins the panel and is then looked up by `user_id` (batches of 100) every hour, so each week's newcomers can be followed afterwards (the basis of the retention and survival analysis). Creators not seen live for `LIVESCOPE_PANEL_EVICT_DAYS` (default 28) stop being looked up, which keeps room for newcomers; they stay in the panel file, marked evicted, so the retention analysis still counts them, and they are reactivated if they reach the top list again. At most `LIVESCOPE_PANEL_MAX` (default 60,000) creators are looked up at once.
 
-At the defaults that is at most about 320 requests per run (20 for the top list, 300 for a full panel), inside Helix's limit of 800 points per minute.
+At the defaults that is at most about 620 requests per run (20 for the top list, 600 for a full panel), inside Helix's limit of 800 points per minute.
 
 **Fields kept:** snapshot time, stream id, broadcaster id/login/name, category id/name, language, viewer count, stream start time, mature flag, tags, source and rank. Stream titles and thumbnails are not stored.
 
-**Storage.** One Parquet file per run on the `data` branch: `raw/twitch_streams/date=YYYY-MM-DD/HHMM.parquet`. Keeping data off `main` keeps the code history readable. At the defaults a snapshot is roughly 100 KB, so a month is around 70 MB.
+**Storage.** Each run writes one Parquet file to the `data` branch: `raw/twitch_streams/date=YYYY-MM-DD/HHMM.parquet`. Keeping data off `main` keeps the code history readable. Once a day (`livescope maintain`, run by the collector):
+
+1. **Compact.** Each finished day's hourly files become one `day.parquet`, deduplicated, without the unused columns (`user_name`, `is_mature`, `tags`), sorted and compressed. This is about 5–6× smaller (a day goes from ~7 MB to ~1.3 MB).
+2. **Save weekly history.** `history/creator_week_base.parquet`, `history/collector_weeks.parquet` and `history/category_week.parquet` hold one row per creator-week, week and category-week for every week that has ended. They are small (~0.7 MB a week) and are never deleted.
+3. **Expire.** Raw days older than `LIVESCOPE_RAW_RETENTION_DAYS` (default 30) are deleted. The SQL models take weeks before the oldest full raw week from history and compute later weeks from raw, so weekly KPIs, growth, streaks, cohorts, survival, segmentation and the models keep their full history. Analyses that need hourly detail (peak hours, the hourly charts, category opportunity over 28 days) use the last 30 days.
+4. **Reset git history.** Git keeps deleted files forever, so whenever step 1 or 3 changed anything, the `data` branch is replaced by a single fresh commit (force-push with lease). The branch stays at roughly 30 days of compact raw data plus history: about 40–60 MB.
+
+Earlier per-run history of the `data` branch is not kept. The run log (`manifest/runs.jsonl`) and the status README carry what matters.
 
 **Quality checks** (`livescope/ingest/quality.py`), run before every write:
 
@@ -34,7 +41,8 @@ On an error nothing is written and the run fails; every run, failed or not, is l
 
 - **Selection.** Creators enter by ranking in the top list. "Creators" means the most-watched end of Twitch; small creators are mostly invisible. Results do not generalise to the long tail.
 - **The panel fixes drop-off, not entry.** Once in the panel, a creator is observed whenever they are live, however few viewers they have, so declines and drop-off are measured properly. Creators who never reach the top list are never observed.
-- **The panel fills up.** After it reaches `LIVESCOPE_PANEL_MAX`, new creators appear only while they rank, and the retention analysis stops admitting new cohorts (it only counts panel creators). At around 1,000–3,000 newcomers a week, 30,000 lasts a few months; raise it if needed, but very large panels make each run slower.
+- **Panel gap, 10–17 October 2026.** The first version capped the panel at 30,000 with no eviction; it filled on 10 October, so creators who first reached the top list between then and the eviction release were not followed and are missing from the retention cohorts.
+- **The panel can still fill.** With about 1,500 newcomers a day, the active panel settles where newcomers balance evictions after 4 weeks offline. If it reaches `LIVESCOPE_PANEL_MAX`, newcomers are not admitted until others are evicted; the status page shows the active count.
 - **Panel creators join on a schedule set by the first run.** The first collection week puts thousands of already-established creators into the panel at once. That cohort is labelled as such in the retention analysis and kept apart from genuine newcomers.
 - **Hourly sampling.** A stream shorter than an hour can fall between snapshots; a stream seen in three snapshots counts as three hours.
 - **Language is not country.** The EU split uses broadcast language. Spanish and Portuguese are mostly Latin American and Brazilian audiences, English is global, and an EU creator streaming in English counts as English.

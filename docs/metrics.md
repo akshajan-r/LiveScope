@@ -78,7 +78,7 @@ Computed for **panel creators** only (see [data.md](data.md)): they are looked u
 | Cohort retention, week k | Share of a cohort live in the k-th week after its cohort week. Counts week-by-week activity, so a skipped week dips and recovers. | `cohort_retention` |
 | Churn | No live week in the two most recent complete weeks. Creators who come back after a longer gap are counted by their last live week. | `creator_lifetime.churned` |
 | Lifetime | Weeks from cohort week to last live week (churned), or weeks followed so far (censored). | `creator_lifetime.duration_weeks` |
-| Survival S(t) | Kaplan–Meier estimate of the share still streaming more than t weeks after their cohort week, with Greenwood/log-log 95% CIs. Reported at 1, 2, 4 and 8 weeks. | `livescope/survival.py` |
+| Survival S(t) | Reported from the third complete week of collection (before that nobody can have churned). Kaplan–Meier estimate of the share still streaming more than t weeks after their cohort week, with Greenwood/log-log 95% CIs. Reported at 1, 2, 4 and 8 weeks. | `livescope/survival.py` |
 | Survival difference | Log-rank test between groups (EU/EEA vs English newcomers; all language groups). | `livescope/survival.py` |
 
 ## Language groups
@@ -96,7 +96,7 @@ Over the last 28 days, for all creators and for each language group (`category_o
 | Top creator share | Share of the category's hours watched that come from its biggest creator. ≥ 50% means the "demand" is mostly one creator's fanbase. |
 | Viewer-hours growth | Hours watched in the last 14 days ÷ the previous 14 days − 1 (null until 28 days are collected). |
 
-Candidates are categories with an index above 1, at least 5 creators and a top creator share below 50%. Rankings wait for 7 days of data. They are hypotheses to test, not conclusions.
+Candidates are categories with an index above 1, at least 20 creators and a top creator share below 50% (with fewer creators, one sponsored or launch-week stream sets the median). Rankings wait for 7 days of data. They are hypotheses to test, not conclusions.
 
 ## Segment definitions
 

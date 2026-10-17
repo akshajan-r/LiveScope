@@ -29,7 +29,8 @@ permissions:
 env:
   LIVESCOPE_DATASTORE: datastore
   LIVESCOPE_MAX_STREAMS: ${{ vars.LIVESCOPE_MAX_STREAMS || '2000' }}
-  LIVESCOPE_PANEL_MAX: ${{ vars.LIVESCOPE_PANEL_MAX || '30000' }}
+  LIVESCOPE_PANEL_MAX: ${{ vars.LIVESCOPE_PANEL_MAX || '60000' }}
+  LIVESCOPE_RAW_RETENTION_DAYS: ${{ vars.LIVESCOPE_RAW_RETENTION_DAYS || '30' }}
 
 jobs:
   ingest:
@@ -62,6 +63,14 @@ jobs:
         # Scheduled runs skip if this hour is done; manual runs always capture.
         run: python -m livescope ingest ${{ github.event_name == 'schedule' && '--skip-if-captured' || '' }}
 
+      # Once a day: merge yesterday's hourly files into one, save weekly
+      # summaries, delete raw days past the retention window. When it changed
+      # anything, the commit below replaces the branch history (SQUASH).
+      - name: Compact and expire old snapshots
+        id: maintain
+        if: ${{ steps.ingest.outcome == 'success' && steps.ingest.outputs.captured == 'true' }}
+        run: python -m livescope maintain
+
       # Runs even when the quality checks fail, so the failed run is recorded
       # in manifest/runs.jsonl and shows in the status table.
       - name: Update the collection status
@@ -70,6 +79,8 @@ jobs:
 
       - name: Commit to the data branch
         if: ${{ always() && steps.ingest.outputs.captured == 'true' }}
+        env:
+          SQUASH: ${{ steps.maintain.outputs.squash == 'true' }}
         run: scripts/push_data_branch.sh datastore "snapshot $(date -u +%Y-%m-%dT%H:%MZ)"
 
       # Rebuild after every new snapshot (Actions minutes are free on public
@@ -153,11 +164,13 @@ jobs:
         with:
           name: tableau-extracts
           path: exports/tableau
-          retention-days: 14
+          # A newer copy is uploaded every hour, so old ones are not kept.
+          retention-days: 1
 
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dashboard/dist
+          retention-days: 1
 
       - id: deploy
         uses: actions/deploy-pages@v4

@@ -22,6 +22,10 @@ def captured_this_hour(settings: Settings, now: datetime | None = None) -> bool:
     return any(day_dir.glob(f"{now:%H}[0-5][0-9].parquet"))
 
 
+def _size(path: Path) -> int:
+    return sum(p.stat().st_size for p in path.rglob("*") if p.is_file()) if path.exists() else 0
+
+
 def load_runs(path: Path) -> pd.DataFrame:
     if not path.exists():
         return pd.DataFrame(columns=["snapshot_at", "status", "top_rows", "panel_rows", "panel_size", "rows", "errors", "warnings"])
@@ -34,7 +38,11 @@ def summary(settings: Settings, now: datetime | None = None) -> dict:
     now = pd.Timestamp(now or datetime.now(timezone.utc)).tz_convert("UTC")
     runs = load_runs(settings.runs_log)
     ok = runs[runs["status"] == "ok"]
+    raw_days = [d for d in settings.raw_dir.glob("date=*") if d.is_dir()] if settings.raw_dir.exists() else []
     out = {
+        "raw_mb": _size(settings.raw_dir) / 1e6,
+        "raw_days": len(raw_days),
+        "history_kb": _size(settings.history_dir) / 1e3,
         "updated_at": f"{now:%Y-%m-%d %H:%M}",
         "snapshots": len(ok),
         "failed_runs": int((runs["status"] != "ok").sum()),
@@ -52,6 +60,7 @@ def summary(settings: Settings, now: datetime | None = None) -> dict:
             hours_since_start=expected,
             coverage=hours_ok / expected if expected else 1.0,
             panel_size=int(ok["panel_size"].iloc[-1]),
+            panel_evicted=int(ok["panel_evicted"].iloc[-1]) if "panel_evicted" in ok and pd.notna(ok["panel_evicted"].iloc[-1]) else 0,
         )
     return out
 
@@ -69,7 +78,11 @@ def to_markdown(settings: Settings, now: datetime | None = None, recent: int = 2
             f"| Snapshots collected | **{s['snapshots']:,}** ({s['rows']:,} rows) |",
             f"| First / latest | {s['first_snapshot']} / {s['last_snapshot']} UTC |",
             f"| Hours captured since the first snapshot | {s['hours_captured']:,} of {s['hours_since_start']:,} ({s['coverage']:.0%}) |",
-            f"| Creators in the tracking panel | {s['panel_size']:,} |",
+            f"| Creators in the tracking panel | {s['panel_size']:,} active"
+            + (f", {s['panel_evicted']:,} dropped after 4 weeks offline" if s["panel_evicted"] else "") + " |",
+            f"| Raw snapshots on disk | {s['raw_mb']:.1f} MB, {s['raw_days']} days "
+            f"({'all kept' if not settings.raw_retention_days else f'last {settings.raw_retention_days} kept'}) |",
+            f"| Weekly history | {s['history_kb']:,.0f} KB |",
             f"| Failed runs | {s['failed_runs']} |",
         ]
         if s["hours_since_last"] > 2:

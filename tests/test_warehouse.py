@@ -130,3 +130,30 @@ def test_missing_raw_dir(tmp_path):
 def test_demo_store_builds(demo_creator_week):
     assert len(demo_creator_week) > 1000
     assert demo_creator_week["is_complete_week"].all()
+
+
+def test_weekly_report_on_tiny(tiny):
+    from livescope.weekly import to_markdown, weekly_report
+
+    r = weekly_report(tiny)
+    assert r["status"] == "ok" and r["this_start"] == "2026-01-19"
+    h = r["headline"]
+    # Week 3: a 10h x 300, b 10h x 50, filler 168h x 1. Week 2: a 10h x 200, filler.
+    assert h["viewer_hours"] == 3000 + 500 + 168
+    assert h["viewer_hours_last"] == 2000 + 168
+    assert {c["user_login"] for c in r["creators_up"][:2]} == {"a", "b"}
+    assert "Week to date" in to_markdown(r)
+
+
+def test_weekly_report_refuses_incomplete_last_week(tmp_path):
+    from livescope.weekly import weekly_report
+
+    raw = tmp_path / "raw"
+    start = pd.Timestamp("2026-01-12 00:07", tz="UTC")
+    # Last week's matching window (Monday-Tuesday) has only 10 of 48 hours.
+    hours = {start - pd.Timedelta(days=7) + pd.Timedelta(hours=h): [rec("a", "a0", 5)] for h in range(10)}
+    hours.update({start + pd.Timedelta(hours=h): [rec("a", "a1", 5)] for h in range(48)})
+    write_hours(raw, hours)
+    con = build(raw)
+    assert "incomplete" in weekly_report(con)["status"]
+    con.close()

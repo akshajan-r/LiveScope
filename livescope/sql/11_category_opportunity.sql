@@ -57,7 +57,8 @@ select
     -- Last 14 days vs the 14 before; null until 28 days have been collected.
     case when (select last_hour - first_hour from bounds) >= interval 27 day
          then c.vh_recent / nullif(c.vh_prior, 0) - 1 end   as viewer_hours_growth,
-    c.creators >= 5                                          as enough_creators
+    -- Below ~20 creators one sponsored or launch-week stream sets the median.
+    c.creators >= 20                                         as enough_creators
 from cats c
 join scope_median m using (scope)
 order by c.scope, opportunity_index desc;

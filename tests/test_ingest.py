@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 
+from pathlib import Path
+
 import pandas as pd
 import pytest
 
@@ -87,3 +89,34 @@ def test_quality_checks():
     report = check_snapshot(df)
     assert report.ok and any("start after" in w for w in report.warnings)
     assert not check_snapshot(df.drop(columns=["language"])).ok
+
+
+def test_panel_eviction_and_reactivation():
+    from livescope.ingest.snapshot import active_ids, load_panel, update_panel
+
+    t0 = pd.Timestamp("2026-10-01 00:00", tz="UTC")
+    snap = lambda users, source="top": pd.DataFrame({  # noqa: E731
+        "user_id": users, "user_login": users, "source": source, "rank": range(1, len(users) + 1)})
+    panel = load_panel(Path("/nonexistent"))
+    panel = update_panel(panel, snap(["a", "b", "c"]), panel_max=3, now=t0)
+    assert active_ids(panel) == ["a", "b", "c"]
+    # Full: d cannot join.
+    panel = update_panel(panel, snap(["a", "d"]), panel_max=3, now=t0 + pd.Timedelta(days=1))
+    assert "d" not in set(panel.user_id)
+    # 30 days later only a has been seen recently: b and c are evicted, which makes room for d.
+    panel = update_panel(panel, snap(["a"], "panel"), panel_max=3, now=t0 + pd.Timedelta(days=29))
+    panel = update_panel(panel, snap(["d"]), panel_max=3, now=t0 + pd.Timedelta(days=30))
+    assert set(active_ids(panel)) == {"a", "d"}
+    assert set(panel.user_id) == {"a", "b", "c", "d"}  # evicted creators stay in the file
+    # b re-enters the top list and is reactivated.
+    panel = update_panel(panel, snap(["b"]), panel_max=3, now=t0 + pd.Timedelta(days=31))
+    assert set(active_ids(panel)) == {"a", "b", "d"}
+
+
+def test_old_panel_files_get_new_columns(tmp_path):
+    from livescope.ingest.snapshot import load_panel
+
+    path = tmp_path / "panel.parquet"
+    pd.DataFrame({"user_id": ["a"], "user_login": ["a"], "first_seen_at": [pd.Timestamp("2026-10-01", tz="UTC")]}).to_parquet(path)
+    panel = load_panel(path)
+    assert panel.evicted_at.isna().all() and panel.last_seen_at.notna().all()
