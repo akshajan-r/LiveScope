@@ -677,3 +677,4 @@
 {"snapshot_at": "2026-10-30T09:01:33.602474+00:00", "top_rows": 2000, "panel_rows": 1220, "panel_size": 30000, "rows": 3220, "errors": [], "warnings": [], "status": "ok", "path": "raw/twitch_streams/date=2026-10-30/0901.parquet"}
 {"snapshot_at": "2026-10-30T10:01:24.652355+00:00", "top_rows": 2000, "panel_rows": 1287, "panel_size": 30000, "rows": 3287, "errors": [], "warnings": [], "status": "ok", "path": "raw/twitch_streams/date=2026-10-30/1001.parquet"}
 {"snapshot_at": "2026-10-30T11:01:31.571717+00:00", "top_rows": 2000, "panel_rows": 1415, "panel_size": 30000, "rows": 3415, "errors": [], "warnings": [], "status": "ok", "path": "raw/twitch_streams/date=2026-10-30/1101.parquet"}
+{"snapshot_at": "2026-10-30T12:01:34.968577+00:00", "top_rows": 2000, "panel_rows": 1596, "panel_size": 30000, "rows": 3596, "errors": [], "warnings": [], "status": "ok", "path": "raw/twitch_streams/date=2026-10-30/1201.parquet"}
